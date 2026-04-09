@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Crossword from '../components/Crossword';
+import { fireConfetti } from '../utils/fireConfetti';
 import './ProjectorScreen.css';
 
 export default function ProjectorScreen({ wsUrl }) {
@@ -44,6 +45,16 @@ export default function ProjectorScreen({ wsUrl }) {
                     delete next[msg.team];
                     return next;
                 });
+            } else if (msg.type === 'complete') {
+                const name = msg.team;
+                fireConfetti();
+                setTeams(prev => ({
+                    ...prev,
+                    [name]: {
+                        ...(prev[name] || { cells: {} }),
+                        completed: true
+                    }
+                }));
             }
         };
 
@@ -102,7 +113,8 @@ export default function ProjectorScreen({ wsUrl }) {
                             readOnly
                             compact
                             variant={(teams[name] || {}).variant || 'A'}
-                            showCorrect={revealCorrect}
+                            status={(teams[name] || {}).completed ? 'won' : 'playing'}
+                            showCorrect={revealCorrect || !!(teams[name] || {}).completed}
                             externalState={(teams[name] || {}).cells || {}}
                         />
                     </div>

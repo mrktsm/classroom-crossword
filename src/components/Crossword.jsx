@@ -190,87 +190,84 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
     const activeClue = focusedCell && !isEffectivelyReadOnly
         ? getActiveClue(focusedCell.r, focusedCell.c, direction, GRID, LABELS)
         : null;
+    const isLocallyComplete = checkComplete(displayCells, GRID, ROWS, COLS, PREFILLED);
 
     return (
         <div className={rootClass}>
             <div className="crossword-board-container">
+                {/*
+                  Shell wraps the grid so overlays/confetti are NOT grid items (they were
+                  auto-placed into a single cell and never visible over the full board).
+                */}
                 <div
                     ref={boardRef}
-                    className="crossword-board"
+                    className="crossword-board-shell"
                     style={{ '--cols': COLS, '--rows': ROWS }}
                 >
-                    {/* Grid cells */}
-                    {Array.from({ length: ROWS }, (_, r) =>
-                        Array.from({ length: COLS }, (_, c) => {
-                            const letter = GRID[r][c];
-                            const key = `${r + 1}-${c + 1}`;
-                            if (letter === null) {
-                                return <span key={key} className="crossword-board__item--blank" />;
-                            }
-                            const isPrefilled = !!PREFILLED[key];
-                            const value = isPrefilled ? PREFILLED[key] : (displayCells[key] || '');
-                            const isCorrect = showCorrect && value.toUpperCase() === letter.toUpperCase();
-                            const isHighlighted = highlightedCells.has(key);
-                            const finalReadOnly = isEffectivelyReadOnly || isPrefilled;
+                    <div className="crossword-board">
+                        {/* Grid cells */}
+                        {Array.from({ length: ROWS }, (_, r) =>
+                            Array.from({ length: COLS }, (_, c) => {
+                                const letter = GRID[r][c];
+                                const key = `${r + 1}-${c + 1}`;
+                                if (letter === null) {
+                                    return <span key={key} className="crossword-board__item--blank" />;
+                                }
+                                const isPrefilled = !!PREFILLED[key];
+                                const value = isPrefilled ? PREFILLED[key] : (displayCells[key] || '');
+                                const shouldShowCorrect = showCorrect || status === 'won' || isLocallyComplete;
+                                const isCorrect = shouldShowCorrect && value.toUpperCase() === letter.toUpperCase();
+                                const isHighlighted = highlightedCells.has(key);
+                                const finalReadOnly = isEffectivelyReadOnly || isPrefilled;
 
-                            return (
-                                <input
-                                    key={key}
-                                    ref={el => inputRefs.current[key] = el}
-                                    className={`crossword-board__item ${isCorrect ? 'crossword-board__item--correct' : ''} ${isHighlighted ? 'crossword-board__item--highlight' : ''} ${isPrefilled ? 'crossword-board__item--prefilled' : ''}`}
-                                    type="text"
-                                    maxLength={1}
-                                    value={value}
-                                    readOnly={finalReadOnly}
-                                    tabIndex={finalReadOnly ? -1 : 0}
-                                    onChange={e => !finalReadOnly && handleChange(r + 1, c + 1, e.target.value)}
-                                    onKeyDown={e => !finalReadOnly && handleKeyDown(e, r + 1, c + 1)}
-                                    onFocus={(e) => {
-                                        handleFocus(r + 1, c + 1);
-                                        e.target.select();
-                                    }}
-                                    onPointerDown={handlePointerDown}
-                                    onBlur={handleBlur}
-                                    autoComplete="off"
-                                    autoCorrect="off"
-                                    spellCheck={false}
-                                />
-                            );
-                        })
-                    )}
+                                return (
+                                    <input
+                                        key={key}
+                                        ref={el => inputRefs.current[key] = el}
+                                        className={`crossword-board__item ${isCorrect ? 'crossword-board__item--correct' : ''} ${isHighlighted ? 'crossword-board__item--highlight' : ''} ${isPrefilled ? 'crossword-board__item--prefilled' : ''}`}
+                                        type="text"
+                                        maxLength={1}
+                                        value={value}
+                                        readOnly={finalReadOnly}
+                                        tabIndex={finalReadOnly ? -1 : 0}
+                                        onChange={e => !finalReadOnly && handleChange(r + 1, c + 1, e.target.value)}
+                                        onKeyDown={e => !finalReadOnly && handleKeyDown(e, r + 1, c + 1)}
+                                        onFocus={(e) => {
+                                            handleFocus(r + 1, c + 1);
+                                            e.target.select();
+                                        }}
+                                        onPointerDown={handlePointerDown}
+                                        onBlur={handleBlur}
+                                        autoComplete="off"
+                                        autoCorrect="off"
+                                        spellCheck={false}
+                                    />
+                                );
+                            })
+                        )}
 
-                    {/* Number labels */}
-                    <div className="crossword-board crossword-board--labels">
-                        {LABELS.map(({ n, r, c }) => (
-                            <span
-                                key={n}
-                                className="crossword-board__item-label"
-                                style={{ gridColumn: c, gridRow: r }}
-                            >
-                                <span className="crossword-board__item-label-text">{n}</span>
-                            </span>
-                        ))}
-                    </div>
-
-                    {/* Win confetti */}
-                    {status === 'won' && (
-                        <div className="crossword-confetti" aria-hidden="true">
-                            {Array.from({ length: 18 }, (_, i) => (
-                                <span key={i} className="crossword-confetti__piece" />
+                        {/* Number labels */}
+                        <div className="crossword-board crossword-board--labels">
+                            {LABELS.map(({ n, r, c }) => (
+                                <span
+                                    key={n}
+                                    className="crossword-board__item-label"
+                                    style={{ gridColumn: c, gridRow: r }}
+                                >
+                                    <span className="crossword-board__item-label-text">{n}</span>
+                                </span>
                             ))}
                         </div>
-                    )}
+                    </div>
 
-                    {/* Lost overlay */}
                     {status === 'lost' && (
-                        <div className="crossword-complete">
+                        <div className="crossword-complete crossword-complete--overlay">
                             <div className="crossword-complete__text" style={{ color: '#e11d48' }}>GAME OVER</div>
                         </div>
                     )}
 
-                    {/* Kicked overlay */}
                     {status === 'kicked' && (
-                        <div className="crossword-complete">
+                        <div className="crossword-complete crossword-complete--overlay">
                             <div className="crossword-complete__text" style={{ color: '#e11d48' }}>KICKED</div>
                         </div>
                     )}
@@ -358,6 +355,19 @@ function getActiveClue(r, c, direction, GRID, LABELS) {
     }
     const label = LABELS.find(l => l.r === startR && l.c === startC);
     return label ? label.n : null;
+}
+
+function checkComplete(cells, GRID, ROWS, COLS, PREFILLED) {
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            if (GRID[r][c] !== null) {
+                const key = `${r + 1}-${c + 1}`;
+                const val = cells[key] || PREFILLED[key];
+                if (!val || val.toUpperCase() !== GRID[r][c].toUpperCase()) return false;
+            }
+        }
+    }
+    return true;
 }
 
 function canUseDirection(r, c, direction, GRID, ROWS, COLS) {

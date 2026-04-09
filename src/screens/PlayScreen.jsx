@@ -1,6 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import Crossword from '../components/Crossword';
+import { fireConfetti } from '../utils/fireConfetti';
 import './PlayScreen.css';
+
+function sameTeam(a, b) {
+    return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
 
 export default function PlayScreen({ teamName, wsUrl }) {
     const wsRef = useRef(null);
@@ -8,6 +13,18 @@ export default function PlayScreen({ teamName, wsUrl }) {
     const [status, setStatus] = useState('playing');
     const [roundKey, setRoundKey] = useState(0);
     const [showCorrect, setShowCorrect] = useState(false);
+    const celebratedWinRef = useRef(false);
+
+    useEffect(() => {
+        if (status === 'won') {
+            if (!celebratedWinRef.current) {
+                celebratedWinRef.current = true;
+                fireConfetti();
+            }
+        } else {
+            celebratedWinRef.current = false;
+        }
+    }, [status]);
 
     useEffect(() => {
         const ws = new WebSocket(wsUrl);
@@ -20,17 +37,18 @@ export default function PlayScreen({ teamName, wsUrl }) {
 
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
-            if (msg.type === 'joined' && msg.team === teamName) {
+            if (msg.type === 'joined' && sameTeam(msg.team, teamName)) {
                 setVariant(msg.variant || 'A');
                 setStatus('playing');
                 setRoundKey(prev => prev + 1);
             } else if (msg.type === 'control_state') {
                 setShowCorrect(Boolean(msg.revealCorrect));
             } else if (msg.type === 'complete') {
-                if (msg.team === teamName) {
+                if (sameTeam(msg.team, teamName)) {
                     setStatus('won');
+                    setShowCorrect(true);
                 }
-            } else if (msg.type === 'team_kicked' && msg.team === teamName) {
+            } else if (msg.type === 'team_kicked' && sameTeam(msg.team, teamName)) {
                 setStatus('kicked');
             } else if (msg.type === 'game_reset') {
                 setStatus('kicked');

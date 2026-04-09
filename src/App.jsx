@@ -1,19 +1,63 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import JoinScreen from './screens/JoinScreen';
 import PlayScreen from './screens/PlayScreen';
 import ProjectorScreen from './screens/ProjectorScreen';
 import './App.css';
 
-function getRoute() {
-  const hash = window.location.hash.replace('#', '') || '/';
-  return hash;
+const TEAM_STORAGE_KEY = 'crossword_team';
+
+function normalizePathname() {
+  let path = window.location.pathname || '/';
+  if (path.length > 1 && path.endsWith('/')) {
+    path = path.slice(0, -1);
+  }
+  if (path === '/play') return '/play';
+  if (path === '/projector') return '/projector';
+  return '/';
+}
+
+function readStoredTeam() {
+  try {
+    return sessionStorage.getItem(TEAM_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeStoredTeam(name) {
+  try {
+    if (name) sessionStorage.setItem(TEAM_STORAGE_KEY, name);
+    else sessionStorage.removeItem(TEAM_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function getInitialRouteAndTeam() {
+  if (typeof window === 'undefined') {
+    return { route: '/', teamName: '' };
+  }
+  const route = normalizePathname();
+  if (route === '/play') {
+    const team = readStoredTeam();
+    return { route, teamName: team };
+  }
+  return { route, teamName: '' };
 }
 
 export default function App() {
-  const [route, setRoute] = useState(getRoute);
-  const [teamName, setTeamName] = useState('');
+  const initial = useMemo(() => getInitialRouteAndTeam(), []);
+  const [route, setRoute] = useState(initial.route);
+  const [teamName, setTeamName] = useState(initial.teamName);
 
-  // Determine WebSocket URL dynamically, with env override for deployments.
+  // If user opened /play without a saved team, send them home.
+  useEffect(() => {
+    if (route === '/play' && !teamName) {
+      window.history.replaceState({}, '', '/');
+      setRoute('/');
+    }
+  }, [route, teamName]);
+
   const wsUrl = useMemo(() => {
     const envUrl = import.meta.env.VITE_WS_URL;
     if (envUrl) return envUrl;
@@ -26,20 +70,29 @@ export default function App() {
     return `${protocol}://${host}:3001`;
   }, []);
 
-  // Listen for hash changes
-  useState(() => {
-    const onHash = () => setRoute(getRoute());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  });
+  useEffect(() => {
+    const onPopState = () => {
+      const next = normalizePathname();
+      setRoute(next);
+      if (next === '/') {
+        setTeamName('');
+        writeStoredTeam('');
+      } else if (next === '/play') {
+        const saved = readStoredTeam();
+        setTeamName(saved);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const handleJoin = (name) => {
     setTeamName(name);
-    window.location.hash = '#/play';
+    writeStoredTeam(name);
+    window.history.pushState({}, '', '/play');
     setRoute('/play');
   };
 
-  // Routing
   if (route === '/projector') {
     return <ProjectorScreen wsUrl={wsUrl} />;
   }
@@ -48,6 +101,5 @@ export default function App() {
     return <PlayScreen teamName={teamName} wsUrl={wsUrl} />;
   }
 
-  // Default: join screen
   return <JoinScreen onJoin={handleJoin} />;
 }
