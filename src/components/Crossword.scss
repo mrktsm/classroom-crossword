@@ -1,0 +1,267 @@
+$cell-size: 44px;
+$cols: 13;
+$rows: 13;
+
+$color-border: #d0d0d0;
+$color-correct: #2a7d3f;
+$color-focus: #3b82f6;
+$color-text: #1a1a1a;
+$color-muted: #888;
+
+.crossword {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.crossword__team-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: $color-muted;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.crossword-board-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.crossword-board {
+  position: relative;
+  background: #fff;
+  border: 2px solid #1a1a1a;
+  display: grid;
+  grid-template-columns: repeat($cols, $cell-size);
+  grid-template-rows: repeat($rows, $cell-size);
+  width: max-content;
+  box-sizing: content-box;
+}
+
+.crossword-board__item {
+  border: none;
+  border-right: 1px solid $color-border;
+  border-bottom: 1px solid $color-border;
+  background: #fff;
+  color: $color-text;
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  padding: 0;
+  margin: 0;
+  width: $cell-size;
+  height: $cell-size;
+  outline: none;
+  caret-color: transparent;
+
+  &:focus {
+    background: #e8f0fe !important;
+    z-index: 20;
+    box-shadow: inset 0 0 0 2px $color-focus;
+  }
+
+  &--correct {
+    color: $color-correct;
+  }
+
+  &--highlight {
+    background: #f0f7ff;
+  }
+}
+
+.crossword-board__item--blank {
+  background: #1a1a1a;
+  border: none;
+  border-right: 1px solid #1a1a1a;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+// Labels
+.crossword-board--labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 30;
+  pointer-events: none;
+  background: transparent;
+  border: none;
+}
+
+.crossword-board__item-label {
+  position: relative;
+  pointer-events: none;
+}
+
+.crossword-board__item-label-text {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  color: $color-muted;
+  font-family: 'Inter', sans-serif;
+}
+
+// Clues
+.crossword-clues {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 32px;
+  flex: 1;
+  min-width: 300px;
+}
+
+.crossword-clues__list {
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 200px;
+}
+
+.crossword-clues__list-title {
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: $color-text;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.crossword-clues__list-item {
+  margin: 0;
+  padding: 4px 8px;
+  margin-left: -8px;
+  font-size: 13px;
+  color: #444;
+  line-height: 1.5;
+  border-radius: 4px;
+  transition: background 0.1s ease;
+
+  &:before {
+    content: attr(data-number) '. ';
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  &--active {
+    background: #eaf2ff;
+    color: #1a1a1a;
+  }
+}
+
+// Completion
+.crossword-complete {
+  position: absolute;
+  z-index: 100;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.92);
+  animation: completeFadeIn 0.4s ease;
+}
+
+.crossword-complete__icon {
+  font-size: 56px;
+  animation: completeBounce 0.5s ease;
+}
+
+.crossword-complete__text {
+  font-size: 36px;
+  font-weight: 800;
+  color: $color-correct;
+  letter-spacing: 4px;
+  margin-top: 8px;
+}
+
+@keyframes completeFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes completeBounce {
+  0% {
+    transform: scale(0);
+  }
+
+  60% {
+    transform: scale(1.15);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+// Read-only
+.crossword--readonly {
+  .crossword-board__item {
+    cursor: default;
+
+    &:focus {
+      background: #fff;
+      border-color: $color-border;
+    }
+  }
+}
+
+// Compact (projector)
+.crossword--compact {
+  $compact-cell: 30px;
+
+  .crossword-board {
+    width: ($compact-cell * $cols);
+    height: ($compact-cell * $rows);
+    grid-template-columns: repeat($cols, $compact-cell);
+    grid-template-rows: repeat($cols, $compact-cell);
+  }
+
+  .crossword-board__item {
+    width: $compact-cell;
+    height: $compact-cell;
+    font-size: 13px;
+  }
+
+  .crossword-board__item-label-text {
+    font-size: 7px;
+    top: 1px;
+    left: 2px;
+  }
+
+  .crossword-complete__icon {
+    font-size: 36px;
+  }
+
+  .crossword-complete__text {
+    font-size: 24px;
+    letter-spacing: 3px;
+  }
+
+  .crossword__team-name {
+    font-size: 11px;
+  }
+}
