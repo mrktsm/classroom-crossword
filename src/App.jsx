@@ -19,6 +19,9 @@ export default function App() {
     if (envUrl) return envUrl;
 
     const host = window.location.hostname || 'localhost';
+    if (host === 'classroom-crossword.vercel.app') {
+      return 'wss://classroom-crossword.onrender.com';
+    }
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     return `${protocol}://${host}:3001`;
   }, []);
