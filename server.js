@@ -4,22 +4,25 @@ const PORT = Number(process.env.PORT) || 3001;
 const wss = new WebSocketServer({ port: PORT });
 
 // Game state
-const teams = {}; // { teamName: { cells: { 'r-c': 'A', ... } } }
+const teams = {}; // { teamName: { cells: { 'r-c': 'A', ... }, variant: 'A' | 'B', completed?: boolean } }
 const projectors = new Set();
 const players = new Map(); // ws -> teamName
 let gameWinner = null;
 
 import { getCrosswordVariant } from './src/crosswordData.js';
 
-// We could choose variant A or B here, or based on ENV var
-const variant = process.env.CROSSWORD_VARIANT || 'A';
-const crosswordData = getCrosswordVariant(variant);
-const GRID = crosswordData.GRID;
-const ROWS = crosswordData.ROWS;
-const COLS = crosswordData.COLS;
-const PREFILLED = crosswordData.PREFILLED;
+function pickVariantForNewTeam() {
+    const counts = { A: 0, B: 0 };
+    for (const teamState of Object.values(teams)) {
+        const variant = teamState.variant === 'B' ? 'B' : 'A';
+        counts[variant] += 1;
+    }
+    return counts.A <= counts.B ? 'A' : 'B';
+}
 
-function checkComplete(cells) {
+function checkComplete(cells, variant) {
+    const crosswordData = getCrosswordVariant(variant);
+    const { GRID, ROWS, COLS, PREFILLED = {} } = crosswordData;
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             if (GRID[r][c] !== null) {
@@ -41,6 +44,13 @@ function broadcast(msg, exclude = null) {
     }
 }
 
+function clearGameState() {
+    for (const teamName of Object.keys(teams)) {
+        delete teams[teamName];
+    }
+    gameWinner = null;
+}
+
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
@@ -56,9 +66,6 @@ wss.on('connection', (ws) => {
             projectors.add(ws);
             // Send current state
             ws.send(JSON.stringify({ type: 'state', teams }));
-            if (gameWinner) {
-                ws.send(JSON.stringify({ type: 'complete', team: gameWinner }));
-            }
             console.log('Projector connected');
         }
 
@@ -66,23 +73,25 @@ wss.on('connection', (ws) => {
             const team = msg.team;
             players.set(ws, team);
             if (!teams[team]) {
-                teams[team] = { cells: {} };
+                teams[team] = { cells: {}, variant: pickVariantForNewTeam() };
             }
+            ws.send(JSON.stringify({
+                type: 'joined',
+                team,
+                variant: teams[team].variant,
+                cells: teams[team].cells
+            }));
             broadcast({ type: 'team_joined', team });
             // Send full state to projectors
             broadcast({ type: 'state', teams });
-            if (gameWinner) {
-                ws.send(JSON.stringify({ type: 'complete', team: gameWinner }));
-            }
             console.log(`Team "${team}" joined`);
         }
 
         else if (msg.type === 'cell') {
-            if (gameWinner) return; // Block submissions if someone already won!
-
             const team = msg.team;
-            if (!teams[team]) teams[team] = { cells: {} };
-            teams[team].cells[`${msg.r}-${msg.c}`] = msg.value;
+            if (!teams[team]) teams[team] = { cells: {}, variant: pickVariantForNewTeam() };
+            const teamState = teams[team];
+            teamState.cells[`${msg.r}-${msg.c}`] = msg.value;
 
             // Broadcast cell update to projectors
             broadcast({
@@ -94,9 +103,12 @@ wss.on('connection', (ws) => {
             });
 
             // Check completion
-            if (checkComplete(teams[team].cells)) {
+            if (!teamState.completed && checkComplete(teamState.cells, teamState.variant)) {
+                teamState.completed = true;
                 console.log(`Team "${team}" completed the crossword!`);
-                gameWinner = team;
+                if (!gameWinner) {
+                    gameWinner = team;
+                }
                 broadcast({ type: 'complete', team });
                 // Notify all players
                 for (const client of players.keys()) {
@@ -120,7 +132,43 @@ wss.on('connection', (ws) => {
             }
             // Notify projectors
             broadcast({ type: 'team_kicked', team });
+            for (const client of players.keys()) {
+                if (client.readyState === 1) {
+                    client.send(JSON.stringify({ type: 'team_kicked', team }));
+                }
+            }
+            if (Object.keys(teams).length === 0) {
+                gameWinner = null;
+                broadcast({ type: 'state', teams });
+            }
             console.log(`Team "${team}" was kicked`);
+        }
+
+        else if (msg.type === 'reset_game') {
+            const kickedTeams = Object.keys(teams);
+
+            // Notify all players before closing their sockets.
+            for (const client of players.keys()) {
+                if (client.readyState === 1) {
+                    client.send(JSON.stringify({ type: 'game_reset' }));
+                }
+            }
+
+            clearGameState();
+            broadcast({ type: 'state', teams });
+            broadcast({ type: 'game_reset' });
+
+            // Disconnect all player clients ("kick everybody")
+            for (const [client] of Array.from(players.entries())) {
+                try {
+                    client.close();
+                } catch {
+                    // ignore close errors
+                }
+                players.delete(client);
+            }
+
+            console.log(`Game reset by projector. Cleared ${kickedTeams.length} teams.`);
         }
     });
 

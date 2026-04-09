@@ -1,12 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { GRID, ROWS, COLS, LABELS, ACROSS_CLUES, DOWN_CLUES, PREFILLED } from '../crosswordData';
+import { getCrosswordVariant } from '../crosswordData';
 import './Crossword.scss';
 
-export default function Crossword({ readOnly = false, externalState = {}, onCellChange, teamName = '', compact = false, status = 'playing' }) {
+export default function Crossword({ readOnly = false, externalState = {}, onCellChange, compact = false, status = 'playing', variant = 'A' }) {
+    const crosswordData = getCrosswordVariant(variant);
+    const { GRID, ROWS, COLS, LABELS, ACROSS_CLUES, DOWN_CLUES, PREFILLED = {} } = crosswordData;
     const [cells, setCells] = useState({});
     const inputRefs = useRef({});
+    const boardRef = useRef(null);
+    const cluesRef = useRef(null);
     const [focusedCell, setFocusedCell] = useState(null);
     const [direction, setDirection] = useState('across');
+    const [areCluesWrapped, setAreCluesWrapped] = useState(false);
+    const [boardWidth, setBoardWidth] = useState(0);
 
     // Use external state (from WebSocket) in read-only mode
     const displayCells = readOnly ? externalState : cells;
@@ -53,6 +59,38 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
         return () => window.removeEventListener('keydown', handleDebugKey);
     }, [readOnly, onCellChange]);
 
+    useEffect(() => {
+        if (compact) return;
+        let frame = null;
+        const updateWrappedState = () => {
+            const boardEl = boardRef.current;
+            const cluesEl = cluesRef.current;
+            if (!boardEl || !cluesEl) return;
+            setBoardWidth(boardEl.offsetWidth);
+            // In the same flex row, tops are nearly equal. Consider it wrapped
+            // only when clues are clearly below the board.
+            const rowDelta = cluesEl.offsetTop - boardEl.offsetTop;
+            setAreCluesWrapped(rowDelta > 24);
+        };
+
+        const scheduleUpdate = () => {
+            if (frame) cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(updateWrappedState);
+        };
+
+        scheduleUpdate();
+        window.addEventListener('resize', scheduleUpdate);
+        const observer = new ResizeObserver(scheduleUpdate);
+        if (boardRef.current) observer.observe(boardRef.current);
+        if (cluesRef.current) observer.observe(cluesRef.current);
+
+        return () => {
+            window.removeEventListener('resize', scheduleUpdate);
+            observer.disconnect();
+            if (frame) cancelAnimationFrame(frame);
+        };
+    }, [compact]);
+
     const handleChange = useCallback((r, c, value) => {
         const letter = value.slice(-1).toUpperCase();
         const key = `${r}-${c}`;
@@ -61,50 +99,70 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
 
         // Auto-advance to next cell in the current word
         if (letter) {
-            const next = direction === 'across' ? findNextInRow(r, c) : findNextInCol(r, c);
+            const next = direction === 'across'
+                ? findNextInRow(r, c, GRID, COLS)
+                : findNextInCol(r, c, GRID, ROWS);
             if (next && inputRefs.current[`${next.r}-${next.c}`]) {
                 inputRefs.current[`${next.r}-${next.c}`].focus();
             }
         }
-    }, [onCellChange, direction]);
+    }, [onCellChange, direction, GRID, COLS, ROWS]);
 
     const handleKeyDown = useCallback((e, r, c) => {
         if (e.key === 'Backspace') {
             const key = `${r}-${c}`;
             if (!displayCells[key]) {
                 // Cell is empty, go to previous in word
-                const prev = direction === 'across' ? findPrevInRow(r, c) : findPrevInCol(r, c);
+                const prev = direction === 'across'
+                    ? findPrevInRow(r, c, GRID)
+                    : findPrevInCol(r, c, GRID);
                 if (prev && inputRefs.current[`${prev.r}-${prev.c}`]) {
                     inputRefs.current[`${prev.r}-${prev.c}`].focus();
                 }
             }
         } else if (e.key === 'ArrowRight') {
             e.preventDefault();
-            setDirection('across');
-            const next = findNextInRow(r, c);
+            if (canUseDirection(r, c, 'across', GRID, ROWS, COLS)) {
+                setDirection('across');
+            }
+            const next = findNextInRow(r, c, GRID, COLS);
             if (next) inputRefs.current[`${next.r}-${next.c}`]?.focus();
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            setDirection('across');
-            const prev = findPrevInRow(r, c);
+            if (canUseDirection(r, c, 'across', GRID, ROWS, COLS)) {
+                setDirection('across');
+            }
+            const prev = findPrevInRow(r, c, GRID);
             if (prev) inputRefs.current[`${prev.r}-${prev.c}`]?.focus();
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setDirection('down');
-            const next = findNextInCol(r, c);
+            if (canUseDirection(r, c, 'down', GRID, ROWS, COLS)) {
+                setDirection('down');
+            }
+            const next = findNextInCol(r, c, GRID, ROWS);
             if (next) inputRefs.current[`${next.r}-${next.c}`]?.focus();
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setDirection('down');
-            const prev = findPrevInCol(r, c);
+            if (canUseDirection(r, c, 'down', GRID, ROWS, COLS)) {
+                setDirection('down');
+            }
+            const prev = findPrevInCol(r, c, GRID);
             if (prev) inputRefs.current[`${prev.r}-${prev.c}`]?.focus();
         }
-    }, [displayCells, direction]);
+    }, [displayCells, direction, GRID, COLS, ROWS]);
 
     const handlePointerDown = (e) => {
         if (isEffectivelyReadOnly) return;
         if (document.activeElement === e.target) {
-            setDirection(prev => prev === 'across' ? 'down' : 'across');
+            const cellKey = Object.keys(inputRefs.current).find(
+                key => inputRefs.current[key] === e.target
+            );
+            if (!cellKey) return;
+            const [r, c] = cellKey.split('-').map(Number);
+            const nextDirection = direction === 'across' ? 'down' : 'across';
+            if (canUseDirection(r, c, nextDirection, GRID, ROWS, COLS)) {
+                setDirection(nextDirection);
+            }
         }
     };
 
@@ -123,20 +181,24 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
     };
 
     // Check if all cells are correctly filled
-    const isComplete = checkComplete(displayCells);
+    const isComplete = checkComplete(displayCells, GRID, ROWS, COLS, PREFILLED);
 
     const rootClass = `crossword ${compact ? 'crossword--compact' : ''} ${isEffectivelyReadOnly ? 'crossword--readonly' : ''}`;
 
     const highlightedCells = new Set(
-        focusedCell && !isEffectivelyReadOnly ? getWordCells(focusedCell.r, focusedCell.c, direction) : []
+        focusedCell && !isEffectivelyReadOnly
+            ? getWordCells(focusedCell.r, focusedCell.c, direction, GRID, ROWS, COLS)
+            : []
     );
-    const activeClue = focusedCell && !isEffectivelyReadOnly ? getActiveClue(focusedCell.r, focusedCell.c, direction) : null;
+    const activeClue = focusedCell && !isEffectivelyReadOnly
+        ? getActiveClue(focusedCell.r, focusedCell.c, direction, GRID, LABELS)
+        : null;
 
     return (
         <div className={rootClass}>
-            {teamName && <div className="crossword__team-name">{teamName}</div>}
             <div className="crossword-board-container">
                 <div
+                    ref={boardRef}
                     className="crossword-board"
                     style={{ '--cols': COLS, '--rows': ROWS }}
                 >
@@ -217,7 +279,11 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
 
                 {/* Clues */}
                 {!compact && (
-                    <div className="crossword-clues">
+                    <div
+                        ref={cluesRef}
+                        className={`crossword-clues ${areCluesWrapped ? 'crossword-clues--wrapped' : ''}`}
+                        style={boardWidth ? { '--wrapped-clues-width': `${boardWidth}px` } : undefined}
+                    >
                         <dl className="crossword-clues__list">
                             <dt className="crossword-clues__list-title">Across</dt>
                             {ACROSS_CLUES.map(({ n, clue }) => (
@@ -243,52 +309,27 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
 
 // --- Helpers ---
 
-function findNextCell(r, c) {
-    // Move right, then down
-    for (let col = c + 1; col <= COLS; col++) {
-        if (GRID[r - 1][col - 1] !== null) return { r, c: col };
-    }
-    for (let row = r + 1; row <= ROWS; row++) {
-        for (let col = 1; col <= COLS; col++) {
-            if (GRID[row - 1][col - 1] !== null) return { r: row, c: col };
-        }
-    }
-    return null;
-}
-
-function findPrevCell(r, c) {
-    for (let col = c - 1; col >= 1; col--) {
-        if (GRID[r - 1][col - 1] !== null) return { r, c: col };
-    }
-    for (let row = r - 1; row >= 1; row--) {
-        for (let col = COLS; col >= 1; col--) {
-            if (GRID[row - 1][col - 1] !== null) return { r: row, c: col };
-        }
-    }
-    return null;
-}
-
-function findNextInRow(r, c) {
+function findNextInRow(r, c, GRID, COLS) {
     if (c + 1 <= COLS && GRID[r - 1][c] !== null) return { r, c: c + 1 };
     return null;
 }
 
-function findPrevInRow(r, c) {
+function findPrevInRow(r, c, GRID) {
     if (c - 1 >= 1 && GRID[r - 1][c - 2] !== null) return { r, c: c - 1 };
     return null;
 }
 
-function findNextInCol(r, c) {
+function findNextInCol(r, c, GRID, ROWS) {
     if (r + 1 <= ROWS && GRID[r][c - 1] !== null) return { r: r + 1, c };
     return null;
 }
 
-function findPrevInCol(r, c) {
+function findPrevInCol(r, c, GRID) {
     if (r - 1 >= 1 && GRID[r - 2][c - 1] !== null) return { r: r - 1, c };
     return null;
 }
 
-function getWordCells(r, c, direction) {
+function getWordCells(r, c, direction, GRID, ROWS, COLS) {
     if (!r || !c || GRID[r - 1][c - 1] === null) return [];
     const cells = [];
     if (direction === 'across') {
@@ -307,7 +348,7 @@ function getWordCells(r, c, direction) {
     return cells;
 }
 
-function getActiveClue(r, c, direction) {
+function getActiveClue(r, c, direction, GRID, LABELS) {
     if (!r || !c || GRID[r - 1][c - 1] === null) return null;
     let startR = r;
     let startC = c;
@@ -320,15 +361,30 @@ function getActiveClue(r, c, direction) {
     return label ? label.n : null;
 }
 
-function checkComplete(cells) {
+function checkComplete(cells, GRID, ROWS, COLS, PREFILLED) {
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             if (GRID[r][c] !== null) {
                 const key = `${r + 1}-${c + 1}`;
-                const val = cells[key];
+                const val = cells[key] || PREFILLED[key];
                 if (!val || val.toUpperCase() !== GRID[r][c].toUpperCase()) return false;
             }
         }
     }
     return true;
+}
+
+function canUseDirection(r, c, direction, GRID, ROWS, COLS) {
+    if (!r || !c || r < 1 || c < 1 || r > ROWS || c > COLS) return false;
+    if (GRID[r - 1][c - 1] === null) return false;
+
+    if (direction === 'across') {
+        const hasLeft = c > 1 && GRID[r - 1][c - 2] !== null;
+        const hasRight = c < COLS && GRID[r - 1][c] !== null;
+        return hasLeft || hasRight;
+    }
+
+    const hasUp = r > 1 && GRID[r - 2][c - 1] !== null;
+    const hasDown = r < ROWS && GRID[r][c - 1] !== null;
+    return hasUp || hasDown;
 }

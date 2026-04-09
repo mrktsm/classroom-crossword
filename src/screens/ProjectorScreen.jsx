@@ -4,7 +4,6 @@ import './ProjectorScreen.css';
 
 export default function ProjectorScreen({ wsUrl }) {
     const [teams, setTeams] = useState({});
-    const [winner, setWinner] = useState(null);
     const wsRef = useRef(null);
 
     useEffect(() => {
@@ -42,8 +41,6 @@ export default function ProjectorScreen({ wsUrl }) {
                     delete next[msg.team];
                     return next;
                 });
-            } else if (msg.type === 'complete') {
-                setWinner(msg.team);
             }
         };
 
@@ -69,9 +66,8 @@ export default function ProjectorScreen({ wsUrl }) {
 
             <div className="projector-screen__boards">
                 {teamNames.map(name => (
-                    <div key={name} className={`projector-screen__team ${winner === name ? 'projector-screen__team--winner' : ''}`}>
+                    <div key={name} className="projector-screen__team">
                         <div className="projector-screen__team-header">
-                            {winner === name && <span className="projector-screen__winner-badge">WINNER</span>}
                             <span className="projector-screen__team-label">{name}</span>
                             <button
                                 className="projector-screen__kick-btn"
@@ -84,19 +80,12 @@ export default function ProjectorScreen({ wsUrl }) {
                         <Crossword
                             readOnly
                             compact
+                            variant={(teams[name] || {}).variant || 'A'}
                             externalState={(teams[name] || {}).cells || {}}
                         />
                     </div>
                 ))}
             </div>
-
-            {winner && (
-                <div className="projector-screen__winner-overlay">
-                    <div className="projector-screen__winner-text">
-                        {winner} wins!
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
