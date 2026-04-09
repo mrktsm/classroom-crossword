@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { GRID, ROWS, COLS, LABELS, ACROSS_CLUES, DOWN_CLUES } from '../crosswordData';
+import { GRID, ROWS, COLS, LABELS, ACROSS_CLUES, DOWN_CLUES, PREFILLED } from '../crosswordData';
 import './Crossword.scss';
 
 export default function Crossword({ readOnly = false, externalState = {}, onCellChange, teamName = '', compact = false, status = 'playing' }) {
@@ -136,7 +136,10 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
         <div className={rootClass}>
             {teamName && <div className="crossword__team-name">{teamName}</div>}
             <div className="crossword-board-container">
-                <div className="crossword-board">
+                <div
+                    className="crossword-board"
+                    style={{ '--cols': COLS, '--rows': ROWS }}
+                >
                     {/* Grid cells */}
                     {Array.from({ length: ROWS }, (_, r) =>
                         Array.from({ length: COLS }, (_, c) => {
@@ -145,22 +148,24 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
                             if (letter === null) {
                                 return <span key={key} className="crossword-board__item--blank" />;
                             }
-                            const value = displayCells[key] || '';
+                            const isPrefilled = !!PREFILLED[key];
+                            const value = isPrefilled ? PREFILLED[key] : (displayCells[key] || '');
                             const isCorrect = value.toUpperCase() === letter.toUpperCase();
                             const isHighlighted = highlightedCells.has(key);
+                            const finalReadOnly = isEffectivelyReadOnly || isPrefilled;
 
                             return (
                                 <input
                                     key={key}
                                     ref={el => inputRefs.current[key] = el}
-                                    className={`crossword-board__item ${isCorrect ? 'crossword-board__item--correct' : ''} ${isHighlighted ? 'crossword-board__item--highlight' : ''}`}
+                                    className={`crossword-board__item ${isCorrect ? 'crossword-board__item--correct' : ''} ${isHighlighted ? 'crossword-board__item--highlight' : ''} ${isPrefilled ? 'crossword-board__item--prefilled' : ''}`}
                                     type="text"
                                     maxLength={1}
                                     value={value}
-                                    readOnly={isEffectivelyReadOnly}
-                                    tabIndex={isEffectivelyReadOnly ? -1 : 0}
-                                    onChange={e => !isEffectivelyReadOnly && handleChange(r + 1, c + 1, e.target.value)}
-                                    onKeyDown={e => !isEffectivelyReadOnly && handleKeyDown(e, r + 1, c + 1)}
+                                    readOnly={finalReadOnly}
+                                    tabIndex={finalReadOnly ? -1 : 0}
+                                    onChange={e => !finalReadOnly && handleChange(r + 1, c + 1, e.target.value)}
+                                    onKeyDown={e => !finalReadOnly && handleKeyDown(e, r + 1, c + 1)}
                                     onFocus={(e) => {
                                         handleFocus(r + 1, c + 1);
                                         e.target.select();

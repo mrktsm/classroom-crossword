@@ -1,0 +1,4 @@
+Generating crosswords...
+Variant A generated: 23/23 words placed. size: 28x24
+Variant B generated: 23/23 words placed. size: 22x26
+Done!

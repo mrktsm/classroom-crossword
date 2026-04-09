@@ -9,29 +9,22 @@ const projectors = new Set();
 const players = new Map(); // ws -> teamName
 let gameWinner = null;
 
-// The correct grid for completion checking
-const GRID = [
-    ['S', 'H', 'R', 'O', 'U', 'D', null, null, 'E', null, 'L', null, 'F'],
-    ['L', null, null, 'R', null, 'A', 'D', 'A', 'M', 'S', 'A', 'L', 'E'],
-    ['I', null, 'S', 'A', 'R', 'I', null, null, 'E', null, 'T', null, 'I'],
-    ['G', 'R', 'A', 'T', 'I', 'S', null, 'O', 'R', 'P', 'H', 'A', 'N'],
-    ['H', null, 'N', 'O', 'D', null, 'F', null, 'A', 'L', 'E', 'R', 'T'],
-    ['T', 'I', 'E', 'R', null, 'J', 'E', 'L', 'L', 'Y', null, 'E', null],
-    [null, 'N', null, null, 'D', 'A', 'T', 'E', 'D', null, null, 'A', null],
-    [null, 'A', null, 'H', 'A', 'B', 'I', 'T', null, 'V', 'E', 'S', 'T'],
-    ['I', 'N', 'F', 'U', 'N', null, 'D', null, 'B', 'I', 'D', null, 'W'],
-    ['S', 'E', 'L', 'E', 'C', 'T', null, 'N', 'E', 'G', 'A', 'T', 'E'],
-    ['L', null, 'O', null, 'E', null, null, 'A', 'T', 'O', 'M', null, 'L'],
-    ['A', 'C', 'C', 'U', 'R', 'A', 'C', 'Y', null, 'U', null, null, 'V'],
-    ['M', null, 'K', null, 'S', null, null, 'S', 'O', 'R', 'T', 'I', 'E'],
-];
+import { getCrosswordVariant } from './src/crosswordData.js';
+
+// We could choose variant A or B here, or based on ENV var
+const variant = process.env.CROSSWORD_VARIANT || 'A';
+const crosswordData = getCrosswordVariant(variant);
+const GRID = crosswordData.GRID;
+const ROWS = crosswordData.ROWS;
+const COLS = crosswordData.COLS;
+const PREFILLED = crosswordData.PREFILLED;
 
 function checkComplete(cells) {
-    for (let r = 0; r < 13; r++) {
-        for (let c = 0; c < 13; c++) {
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
             if (GRID[r][c] !== null) {
                 const key = `${r + 1}-${c + 1}`;
-                const val = cells[key];
+                const val = cells[key] || PREFILLED[key];
                 if (!val || val.toUpperCase() !== GRID[r][c].toUpperCase()) return false;
             }
         }

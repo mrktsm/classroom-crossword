@@ -21,32 +21,38 @@ $color-muted: #888;
   color: $color-muted;
   text-transform: uppercase;
   letter-spacing: 3px;
+  position: sticky;
+  top: 16px;
+  z-index: 200;
+  background: #ffffff;
+  padding: 8px 24px;
+  border: 1px solid #d0d0d0;
+  border-radius: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .crossword-board-container {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 32px;
+  gap: 80px;
   align-items: flex-start;
   justify-content: center;
 }
 
 .crossword-board {
   position: relative;
-  background: #fff;
-  border: 2px solid #1a1a1a;
+  background: transparent;
+  border: none;
   display: grid;
-  grid-template-columns: repeat($cols, $cell-size);
-  grid-template-rows: repeat($rows, $cell-size);
+  grid-template-columns: repeat(var(--cols), $cell-size);
+  grid-template-rows: repeat(var(--rows), $cell-size);
   width: max-content;
   box-sizing: content-box;
 }
 
 .crossword-board__item {
-  border: none;
-  border-right: 1px solid $color-border;
-  border-bottom: 1px solid $color-border;
+  border: 1px solid $color-border;
   background: #fff;
   color: $color-text;
   position: relative;
@@ -76,13 +82,17 @@ $color-muted: #888;
   &--highlight {
     background: #f0f7ff;
   }
+
+  &--prefilled {
+    color: #64748b; // A nice slate color for hints
+    background-color: #f8fafc;
+    font-weight: 700;
+  }
 }
 
 .crossword-board__item--blank {
-  background: #1a1a1a;
+  background: transparent;
   border: none;
-  border-right: 1px solid #1a1a1a;
-  border-bottom: 1px solid #1a1a1a;
 }
 
 // Labels
@@ -114,14 +124,18 @@ $color-muted: #888;
   font-family: 'Inter', sans-serif;
 }
 
-// Clues
 .crossword-clues {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
   gap: 32px;
   flex: 1;
   min-width: 300px;
+  position: sticky;
+  top: 32px;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding-right: 16px; // For custom scrollbar breathing room
 }
 
 .crossword-clues__list {
@@ -149,7 +163,7 @@ $color-muted: #888;
   font-size: 13px;
   color: #444;
   line-height: 1.5;
-  border-radius: 4px;
+  border-radius: 0px;
   transition: background 0.1s ease;
 
   &:before {
@@ -176,7 +190,8 @@ $color-muted: #888;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.92);
+  pointer-events: none;
+  background: transparent;
   animation: completeFadeIn 0.4s ease;
 }
 
@@ -191,6 +206,11 @@ $color-muted: #888;
   color: $color-correct;
   letter-spacing: 4px;
   margin-top: 8px;
+  background: #fff;
+  padding: 16px 32px;
+  border: 1px solid #d0d0d0;
+  border-radius: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 @keyframes completeFadeIn {
@@ -234,10 +254,10 @@ $color-muted: #888;
   $compact-cell: 30px;
 
   .crossword-board {
-    width: ($compact-cell * $cols);
-    height: ($compact-cell * $rows);
-    grid-template-columns: repeat($cols, $compact-cell);
-    grid-template-rows: repeat($cols, $compact-cell);
+    width: calc($compact-cell * var(--cols));
+    height: calc($compact-cell * var(--rows));
+    grid-template-columns: repeat(var(--cols), $compact-cell);
+    grid-template-rows: repeat(var(--rows), $compact-cell);
   }
 
   .crossword-board__item {
