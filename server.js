@@ -8,6 +8,7 @@ const teams = {}; // { teamName: { cells: { 'r-c': 'A', ... }, variant: 'A' | 'B
 const projectors = new Set();
 const players = new Map(); // ws -> teamName
 let gameWinner = null;
+let revealCorrect = false;
 
 import { getCrosswordVariant } from './src/crosswordData.js';
 
@@ -44,11 +45,21 @@ function broadcast(msg, exclude = null) {
     }
 }
 
+function broadcastPlayers(msg) {
+    const data = JSON.stringify(msg);
+    for (const client of players.keys()) {
+        if (client.readyState === 1) {
+            client.send(data);
+        }
+    }
+}
+
 function clearGameState() {
     for (const teamName of Object.keys(teams)) {
         delete teams[teamName];
     }
     gameWinner = null;
+    revealCorrect = false;
 }
 
 wss.on('connection', (ws) => {
@@ -66,6 +77,7 @@ wss.on('connection', (ws) => {
             projectors.add(ws);
             // Send current state
             ws.send(JSON.stringify({ type: 'state', teams }));
+            ws.send(JSON.stringify({ type: 'control_state', revealCorrect }));
             console.log('Projector connected');
         }
 
@@ -81,6 +93,7 @@ wss.on('connection', (ws) => {
                 variant: teams[team].variant,
                 cells: teams[team].cells
             }));
+            ws.send(JSON.stringify({ type: 'control_state', revealCorrect }));
             broadcast({ type: 'team_joined', team });
             // Send full state to projectors
             broadcast({ type: 'state', teams });
@@ -111,11 +124,7 @@ wss.on('connection', (ws) => {
                 }
                 broadcast({ type: 'complete', team });
                 // Notify all players
-                for (const client of players.keys()) {
-                    if (client.readyState === 1) {
-                        client.send(JSON.stringify({ type: 'complete', team }));
-                    }
-                }
+                broadcastPlayers({ type: 'complete', team });
             }
         }
 
@@ -132,31 +141,33 @@ wss.on('connection', (ws) => {
             }
             // Notify projectors
             broadcast({ type: 'team_kicked', team });
-            for (const client of players.keys()) {
-                if (client.readyState === 1) {
-                    client.send(JSON.stringify({ type: 'team_kicked', team }));
-                }
-            }
+            broadcastPlayers({ type: 'team_kicked', team });
             if (Object.keys(teams).length === 0) {
                 gameWinner = null;
+                revealCorrect = false;
                 broadcast({ type: 'state', teams });
+                broadcast({ type: 'control_state', revealCorrect });
             }
             console.log(`Team "${team}" was kicked`);
+        }
+
+        else if (msg.type === 'set_reveal_correct') {
+            revealCorrect = Boolean(msg.value);
+            const controlMsg = { type: 'control_state', revealCorrect };
+            broadcast(controlMsg);
+            broadcastPlayers(controlMsg);
         }
 
         else if (msg.type === 'reset_game') {
             const kickedTeams = Object.keys(teams);
 
             // Notify all players before closing their sockets.
-            for (const client of players.keys()) {
-                if (client.readyState === 1) {
-                    client.send(JSON.stringify({ type: 'game_reset' }));
-                }
-            }
+            broadcastPlayers({ type: 'game_reset' });
 
             clearGameState();
             broadcast({ type: 'state', teams });
             broadcast({ type: 'game_reset' });
+            broadcast({ type: 'control_state', revealCorrect });
 
             // Disconnect all player clients ("kick everybody")
             for (const [client] of Array.from(players.entries())) {

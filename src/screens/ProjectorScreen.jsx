@@ -4,6 +4,7 @@ import './ProjectorScreen.css';
 
 export default function ProjectorScreen({ wsUrl }) {
     const [teams, setTeams] = useState({});
+    const [revealCorrect, setRevealCorrect] = useState(false);
     const wsRef = useRef(null);
 
     useEffect(() => {
@@ -19,6 +20,8 @@ export default function ProjectorScreen({ wsUrl }) {
 
             if (msg.type === 'state') {
                 setTeams(msg.teams);
+            } else if (msg.type === 'control_state') {
+                setRevealCorrect(Boolean(msg.revealCorrect));
             } else if (msg.type === 'cell') {
                 setTeams(prev => ({
                     ...prev,
@@ -54,10 +57,28 @@ export default function ProjectorScreen({ wsUrl }) {
         }
     };
 
+    const toggleRevealCorrect = () => {
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'set_reveal_correct',
+                value: !revealCorrect
+            }));
+        }
+    };
+
     const teamNames = Object.keys(teams);
 
     return (
         <div className="projector-screen">
+            <div className="projector-screen__controls">
+                <button
+                    className={`projector-screen__control-btn ${revealCorrect ? 'projector-screen__control-btn--active' : ''}`}
+                    onClick={toggleRevealCorrect}
+                >
+                    {revealCorrect ? 'Hide Correct Letters' : 'Reveal Correct Letters'}
+                </button>
+            </div>
             {teamNames.length === 0 && (
                 <div className="projector-screen__waiting">
                     Waiting for teams to join...
@@ -81,6 +102,7 @@ export default function ProjectorScreen({ wsUrl }) {
                             readOnly
                             compact
                             variant={(teams[name] || {}).variant || 'A'}
+                            showCorrect={revealCorrect}
                             externalState={(teams[name] || {}).cells || {}}
                         />
                     </div>

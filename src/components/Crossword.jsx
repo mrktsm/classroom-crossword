@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { getCrosswordVariant } from '../crosswordData';
 import './Crossword.scss';
 
-export default function Crossword({ readOnly = false, externalState = {}, onCellChange, compact = false, status = 'playing', variant = 'A' }) {
+export default function Crossword({ readOnly = false, externalState = {}, onCellChange, compact = false, status = 'playing', variant = 'A', showCorrect = false }) {
     const crosswordData = getCrosswordVariant(variant);
     const { GRID, ROWS, COLS, LABELS, ACROSS_CLUES, DOWN_CLUES, PREFILLED = {} } = crosswordData;
     const [cells, setCells] = useState({});
@@ -180,9 +180,6 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
         }
     };
 
-    // Check if all cells are correctly filled
-    const isComplete = checkComplete(displayCells, GRID, ROWS, COLS, PREFILLED);
-
     const rootClass = `crossword ${compact ? 'crossword--compact' : ''} ${isEffectivelyReadOnly ? 'crossword--readonly' : ''}`;
 
     const highlightedCells = new Set(
@@ -212,7 +209,7 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
                             }
                             const isPrefilled = !!PREFILLED[key];
                             const value = isPrefilled ? PREFILLED[key] : (displayCells[key] || '');
-                            const isCorrect = value.toUpperCase() === letter.toUpperCase();
+                            const isCorrect = showCorrect && value.toUpperCase() === letter.toUpperCase();
                             const isHighlighted = highlightedCells.has(key);
                             const finalReadOnly = isEffectivelyReadOnly || isPrefilled;
 
@@ -255,10 +252,12 @@ export default function Crossword({ readOnly = false, externalState = {}, onCell
                         ))}
                     </div>
 
-                    {/* Completion overlay (winner) */}
-                    {(isComplete && status !== 'lost' && status !== 'kicked' || status === 'won') && (
-                        <div className="crossword-complete">
-                            <div className="crossword-complete__text">DONE!</div>
+                    {/* Win confetti */}
+                    {status === 'won' && (
+                        <div className="crossword-confetti" aria-hidden="true">
+                            {Array.from({ length: 18 }, (_, i) => (
+                                <span key={i} className="crossword-confetti__piece" />
+                            ))}
                         </div>
                     )}
 
@@ -359,19 +358,6 @@ function getActiveClue(r, c, direction, GRID, LABELS) {
     }
     const label = LABELS.find(l => l.r === startR && l.c === startC);
     return label ? label.n : null;
-}
-
-function checkComplete(cells, GRID, ROWS, COLS, PREFILLED) {
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-            if (GRID[r][c] !== null) {
-                const key = `${r + 1}-${c + 1}`;
-                const val = cells[key] || PREFILLED[key];
-                if (!val || val.toUpperCase() !== GRID[r][c].toUpperCase()) return false;
-            }
-        }
-    }
-    return true;
 }
 
 function canUseDirection(r, c, direction, GRID, ROWS, COLS) {

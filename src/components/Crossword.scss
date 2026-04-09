@@ -231,6 +231,32 @@ $color-muted: #888;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
+.crossword-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 90;
+}
+
+.crossword-confetti__piece {
+  position: absolute;
+  top: -12%;
+  width: 8px;
+  height: 14px;
+  opacity: 0.95;
+  animation: confettiFall 2.4s linear infinite;
+}
+
+@for $i from 1 through 18 {
+  .crossword-confetti__piece:nth-child(#{$i}) {
+    left: #{($i - 1) * 5.5%};
+    animation-delay: #{($i - 1) * 0.08}s;
+    transform: rotate(#{($i * 17) % 360}deg);
+    background: hsl((($i * 37) % 360) * 1deg, 85%, 58%);
+  }
+}
+
 @keyframes completeFadeIn {
   from {
     opacity: 0;
@@ -255,6 +281,22 @@ $color-muted: #888;
   }
 }
 
+@keyframes confettiFall {
+  0% {
+    transform: translateY(-10%) rotate(0deg);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(120%) rotate(520deg);
+    opacity: 0.95;
+  }
+}
+
 // Read-only
 .crossword--readonly {
   .crossword-board__item {
@@ -269,7 +311,7 @@ $color-muted: #888;
 
 // Compact (projector)
 .crossword--compact {
-  --cell-size: clamp(20px, 2vw, 28px);
+  --cell-size: clamp(14px, 1.3vw, 20px);
 
   .crossword-board {
     width: calc(var(--cell-size) * var(--cols));
