@@ -1,6 +1,6 @@
 import { WebSocketServer } from 'ws';
 
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 const wss = new WebSocketServer({ port: PORT });
 
 // Game state
@@ -134,4 +134,4 @@ wss.on('connection', (ws) => {
     });
 });
 
-console.log(`WebSocket server running on ws://localhost:${PORT}`);
+console.log(`WebSocket server running on port ${PORT}`);

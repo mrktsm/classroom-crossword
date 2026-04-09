@@ -13,10 +13,14 @@ export default function App() {
   const [route, setRoute] = useState(getRoute);
   const [teamName, setTeamName] = useState('');
 
-  // Determine WebSocket URL dynamically
+  // Determine WebSocket URL dynamically, with env override for deployments.
   const wsUrl = useMemo(() => {
+    const envUrl = import.meta.env.VITE_WS_URL;
+    if (envUrl) return envUrl;
+
     const host = window.location.hostname || 'localhost';
-    return `ws://${host}:3001`;
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${protocol}://${host}:3001`;
   }, []);
 
   // Listen for hash changes

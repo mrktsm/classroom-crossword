@@ -1,16 +1,57 @@
-# React + Vite
+# Classroom Crossword
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Real-time classroom crossword app:
+- frontend (Vite + React)
+- backend (Node WebSocket server in `server.js`)
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Install dependencies:
+   - `npm install`
+2. Run frontend:
+   - `npm run dev`
+3. Run backend (separate terminal):
+   - `npm run server`
 
-## React Compiler
+Frontend defaults to `ws://<current-host>:3001` unless `VITE_WS_URL` is set.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Environment variables
 
-## Expanding the ESLint configuration
+Copy `.env.example` to your own env files as needed.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `VITE_WS_URL`: full websocket URL used by frontend (example: `wss://my-backend.onrender.com`)
+- `PORT`: backend websocket port (host providers usually inject this automatically)
+- `CROSSWORD_VARIANT`: `A` or `B` on the backend
+
+## Deploy frontend to Vercel
+
+1. Push repo to GitHub.
+2. In Vercel, import the GitHub repository.
+3. Framework preset: `Vite`.
+4. Build command: `npm run build`.
+5. Output directory: `dist`.
+6. In Vercel project settings, add env var:
+   - `VITE_WS_URL = wss://<your-backend-domain>`
+7. Redeploy.
+
+## Deploy backend (WebSocket) to Render
+
+Vercel serverless functions are not a good fit for long-lived WebSocket servers, so host `server.js` on a Node host such as Render/Railway/Fly.io.
+
+### Render quick setup
+
+1. Create a new `Web Service` from this repo.
+2. Runtime: `Node`.
+3. Build command: `npm install`.
+4. Start command: `npm run server`.
+5. Environment variable (optional):
+   - `CROSSWORD_VARIANT = A` (or `B`)
+6. Deploy and copy your service URL.
+7. Set `VITE_WS_URL` in Vercel to that `wss://...` URL and redeploy frontend.
+
+## Deploy backend (alternative: Railway)
+
+1. New project from GitHub repo.
+2. Start command: `npm run server`.
+3. Railway injects `PORT` automatically.
+4. Copy public URL and set `VITE_WS_URL` in Vercel.
